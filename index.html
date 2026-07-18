@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <!-- Important for mobile: ensures responsive scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>SidecarTridge Public Floppy Database</title>
+
+  <!-- Pure.css (CDN) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css"
+    integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous" />
+  <!-- Grid responsiveness (sm, md, lg classes) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/grids-responsive-min.css" />
+  <link rel="stylesheet" href="styles.css?v=1.0" />
+
+  <!-- Font Awesome for icons (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+
+  <script>
+    function appManager() {
+      return {
+        baseDownloadUrl: 'https://ataristdb.sidecartridge.com/',
+        initialized: false,
+        parsedEntries: [],
+        loaded: false,
+        currentLetter: '',
+        itemsCount: 0,
+        totalLetters: 0,
+        search: '',
+        labels: [],
+        selectedLabel: '',
+        navMenuOpen: false,
+        normalizedSearch() {
+          return String(this.search || '').trim().toLowerCase();
+        },
+        hasActiveFilters() {
+          return !!(this.normalizedSearch() || this.selectedLabel);
+        },
+        clearFilters() {
+          this.search = '';
+          this.selectedLabel = '';
+        },
+        entryMatchesFilters(entry, includeLabel = true) {
+          const q = this.normalizedSearch();
+          const name = String((entry && entry.name) || '').toLowerCase();
+          if (q && !name.includes(q)) return false;
+          if (includeLabel && this.selectedLabel && entry.label !== this.selectedLabel) return false;
+          return true;
+        },
+        filteredNewEntries() {
+          return this.parsedEntries
+            .filter(entry => !!entry.time && this.entryMatchesFilters(entry))
+            .sort((a, b) => Number(b.time) - Number(a.time));
+        },
+        filteredArchiveEntries() {
+          return this.parsedEntries
+            .filter(entry => !entry.time && this.entryMatchesFilters(entry))
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        },
+        recentDisplayEntries() {
+          const limit = this.hasActiveFilters() ? 18 : 12;
+          return this.filteredNewEntries().slice(0, limit);
+        },
+        archiveDisplayEntries() {
+          return this.filteredArchiveEntries().slice(0, 80);
+        },
+        recentResultsTruncated() {
+          const limit = this.hasActiveFilters() ? 18 : 12;
+          return this.filteredNewEntries().length > limit;
+        },
+        archiveResultsTruncated() {
+          return this.filteredArchiveEntries().length > 80;
+        },
+        archiveExploreEnabled() {
+          return this.hasActiveFilters();
+        },
+        taxonomyLabels() {
+          const counts = new Map();
+          this.parsedEntries.forEach(entry => {
+            if (!entry.label || !this.entryMatchesFilters(entry, false)) return;
+            counts.set(entry.label, (counts.get(entry.label) || 0) + 1);
+          });
+          const labels = Array.from(counts.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name));
+          if (this.selectedLabel && !labels.some(label => label.name === this.selectedLabel)) {
+            labels.unshift({ name: this.selectedLabel, count: 0 });
+          }
+          return labels;
+        },
+        totalFilteredCount() {
+          return this.filteredNewEntries().length + this.filteredArchiveEntries().length;
+        },
+        summaryText() {
+          if (!this.hasActiveFilters()) {
+            return `Tracking ${this.filteredNewEntries().length} recent arrivals and ${this.filteredArchiveEntries().length} archive entries.`;
+          }
+          return `${this.totalFilteredCount()} matches across recent arrivals and archive.`;
+        },
+        formatEntryTime(ts) {
+          if (!ts) return '';
+          return new Date(Number(ts) * 1000).toLocaleDateString();
+        },
+        recentSectionDescription() {
+          return this.hasActiveFilters()
+            ? 'Recent arrivals matching the current search and taxonomy filters.'
+            : 'Latest additions to the public floppy database.';
+        },
+        archiveSectionDescription() {
+          return this.hasActiveFilters()
+            ? 'Archive matches from the main catalog.'
+            : 'Use the search box or taxonomy chips to explore the full archive.';
+        },
+        init() {
+          if (this.initialized) return;
+          this.initialized = true;
+          this.loadFiles();
+        },
+        async loadFiles() {
+          const baseUrl = this.baseDownloadUrl + 'db/';
+          const letters = 'abcdefghijklmnopqrstuvwxyz0123456789_';
+          // reset progress state
+          this.parsedEntries = [];
+          this.itemsCount = 0;
+          this.loaded = false;
+          this.totalLetters = letters.length;
+
+          for (const ch of letters) {
+            this.currentLetter = ch;
+            try {
+              const res = await fetch(`${baseUrl}${ch}.csv`);
+              if (res.ok) {
+                const txt = await res.text();
+                const lines = txt.split('\n').filter(l => l.trim());
+                for (const line of lines) {
+                  const parts = line.split(';');
+                  if (parts.length === 6) {
+                    // remove carriage returns, trim whitespace, then strip surrounding quotes
+                    const cleaned = parts.map(s => s.replace(/\r/g, '').trim().replace(/^"|"$/g, ''));
+                    const [f1, , f3, , f5, f6] = cleaned;
+                    const entry = { name: f1, time: f3 || null, label: f5, path: f6 };
+                    if (this.currentLetter === '_') {
+                      // only dedupe for underscore file
+                      if (!this.parsedEntries.some(e => e.name === entry.name && e.time === entry.time && e.label === entry.label && e.path === entry.path)) {
+                        this.parsedEntries.push(entry);
+                        this.itemsCount = this.parsedEntries.length;
+                      }
+                    } else {
+                      this.parsedEntries.push(entry);
+                      this.itemsCount = this.parsedEntries.length;
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore missing or inaccessible files
+            }
+          }
+          this.currentLetter = '';
+          // collect unique labels
+          const set = new Set(this.parsedEntries.map(e => e.label).filter(Boolean));
+          this.labels = Array.from(set).sort();
+          this.loaded = true;
+        }
+      };
+    }
+  </script>
+
+
+</head>
+
+<body class="browser-page" x-data="appManager()" x-init="init()">
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="app-header-copy">
+        <span class="app-header-kicker">SidecarTridge Multi-device</span>
+        <h1>Public Floppy Database</h1>
+      </div>
+      <button type="button" class="app-nav-toggle" aria-controls="primaryNav"
+        :aria-expanded="navMenuOpen ? 'true' : 'false'" @click="navMenuOpen = !navMenuOpen">
+        <i class="fas" :class="navMenuOpen ? 'fa-xmark' : 'fa-bars'"></i>
+        <span x-text="navMenuOpen ? 'Close' : 'Menu'"></span>
+      </button>
+    </div>
+  </header>
+
+  <nav id="primaryNav" class="app-nav" :class="{'is-open': navMenuOpen}">
+    <div class="app-nav-inner">
+      <a href="#" class="app-nav-link is-active" aria-current="page">Floppy DB</a>
+      <a href="https://docs.sidecartridge.com/sidecartridge-multidevice/publicfloppydb/#how-to-contribute"
+        target="_blank" class="app-nav-link" @click="navMenuOpen = false">Contribute</a>
+      <a href="https://docs.sidecartridge.com/sidecartridge-multidevice/microfirmwares/browser/" target="_blank"
+        class="app-nav-link" @click="navMenuOpen = false">Help</a>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="main-content browser-main">
+    <section class="browser-hero">
+      <div class="browser-hero-copy">
+        <span class="browser-kicker">Public Floppy Database</span>
+        <h2>Explore new homebrew software alongside the timeless classics.</h2>
+        <p>
+          The database moves in two directions: fresh uploads and the classic releases preserved in crew collections.
+          Use What&apos;s New for the latest arrivals, and the search engine to revisit old favorites.
+        </p>
+      </div>
+      <div class="browser-stat-grid">
+        <div class="browser-stat-card">
+          <span>Recent</span>
+          <strong x-text="parsedEntries.filter(entry => !!entry.time).length"></strong>
+        </div>
+        <div class="browser-stat-card">
+          <span>Archive</span>
+          <strong x-text="parsedEntries.filter(entry => !entry.time).length"></strong>
+        </div>
+        <div class="browser-stat-card">
+          <span>Labels</span>
+          <strong x-text="labels.length"></strong>
+        </div>
+      </div>
+    </section>
+    <div x-show="!loaded" class="browser-loading">
+      <div class="browser-loading-card">
+        <i class="fas fa-spinner fa-spin"></i>
+        <div>
+          <strong>Indexing floppy database…</strong>
+          <p>Loaded <span x-text="itemsCount"></span> items so far.</p>
+        </div>
+      </div>
+    </div>
+    <div x-show="loaded" class="browser-shell">
+      <section class="browser-filter-panel">
+        <div class="browser-search-row">
+          <label class="browser-search-field">
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="text" x-model="search" placeholder="Search by title…"
+              title="Search by application title" />
+          </label>
+          <button type="button" class="pure-button" x-show="hasActiveFilters()" @click="clearFilters()">Clear
+            Filters</button>
+        </div>
+        <div class="browser-taxonomy">
+          <button type="button" class="taxonomy-chip" :class="{'active': !selectedLabel}"
+            @click="selectedLabel = ''">
+            <span>All Labels</span>
+            <strong x-text="parsedEntries.filter(entry => entryMatchesFilters(entry, false)).length"></strong>
+          </button>
+          <template x-for="label in taxonomyLabels()" :key="label.name">
+            <button type="button" class="taxonomy-chip" :class="{'active': selectedLabel === label.name}"
+              @click="selectedLabel = selectedLabel === label.name ? '' : label.name">
+              <span x-text="label.name"></span>
+              <strong x-text="label.count"></strong>
+            </button>
+          </template>
+        </div>
+        <p class="browser-summary" x-text="summaryText()"></p>
+      </section>
+
+      <section class="browser-section">
+        <div class="browser-section-head">
+          <div>
+            <span class="browser-section-kicker">Recent</span>
+            <h3>What’s New</h3>
+          </div>
+          <span class="browser-count-badge" x-text="filteredNewEntries().length"></span>
+        </div>
+        <p class="browser-section-copy" x-text="recentSectionDescription()"></p>
+        <template x-if="recentDisplayEntries().length > 0">
+          <div class="browser-card-grid">
+            <template x-for="(entry, idx) in recentDisplayEntries()" :key="entry.path + '-recent-' + idx">
+              <article class="browser-entry-card browser-entry-featured">
+                <div class="browser-entry-featured-main">
+                  <div class="browser-entry-topline">
+                    <span class="browser-entry-date" x-text="formatEntryTime(entry.time)"></span>
+                    <span class="browser-entry-tag" x-show="entry.label" x-text="entry.label"></span>
+                  </div>
+                  <h4 x-text="entry.name"></h4>
+                  <p class="browser-entry-path" x-text="entry.path"></p>
+                </div>
+                <div class="browser-entry-actions browser-entry-actions-rail">
+                  <a class="browser-download-button" :href="baseDownloadUrl + entry.path" target="_blank"
+                    rel="noopener" aria-label="Download image">
+                    <span class="fas fa-download" aria-hidden="true"></span>
+                  </a>
+                </div>
+              </article>
+            </template>
+          </div>
+        </template>
+        <p class="browser-inline-note" x-show="recentResultsTruncated()">Showing the first recent matches. Narrow the
+          search or choose a taxonomy chip to focus the list.</p>
+        <template x-if="recentDisplayEntries().length === 0">
+          <div class="browser-empty-state">
+            <i class="fas fa-box-open"></i>
+            <p>No recent arrivals match the current filters.</p>
+          </div>
+        </template>
+      </section>
+
+      <section class="browser-section browser-section-archive">
+        <div class="browser-section-head">
+          <div>
+            <span class="browser-section-kicker">Archive</span>
+            <h3>Main Catalog</h3>
+          </div>
+          <span class="browser-count-badge" x-text="filteredArchiveEntries().length"></span>
+        </div>
+        <p class="browser-section-copy" x-text="archiveSectionDescription()"></p>
+        <template x-if="archiveExploreEnabled() && archiveDisplayEntries().length > 0">
+          <div class="browser-list">
+            <template x-for="(entry, idx) in archiveDisplayEntries()" :key="entry.path + '-archive-' + idx">
+              <article class="browser-entry-row">
+                <div class="browser-entry-row-main">
+                  <div class="browser-entry-row-title">
+                    <h4 x-text="entry.name"></h4>
+                    <span class="browser-entry-tag" x-show="entry.label" x-text="entry.label"></span>
+                  </div>
+                  <p class="browser-entry-path" x-text="entry.path"></p>
+                </div>
+                <div class="browser-entry-actions browser-entry-actions-rail">
+                  <a class="browser-download-button" :href="baseDownloadUrl + entry.path" target="_blank"
+                    rel="noopener" aria-label="Download image">
+                    <span class="fas fa-download" aria-hidden="true"></span>
+                  </a>
+                </div>
+              </article>
+            </template>
+          </div>
+        </template>
+        <p class="browser-inline-note" x-show="archiveExploreEnabled() && archiveResultsTruncated()">Showing the first
+          80 archive matches. Refine the search or taxonomy to narrow it down.</p>
+        <template x-if="!archiveExploreEnabled()">
+          <div class="browser-empty-state browser-empty-state-muted">
+            <i class="fas fa-tags"></i>
+            <p>Use the search box or taxonomy chips to explore the full archive without flooding the page.</p>
+          </div>
+        </template>
+        <template x-if="archiveExploreEnabled() && archiveDisplayEntries().length === 0">
+          <div class="browser-empty-state">
+            <i class="fas fa-folder-open"></i>
+            <p>No archive entries match the current filters.</p>
+          </div>
+        </template>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- Footer information in-page -->
+  <footer class="footer">
+    <p>&copy; 2025-26 GOODDATA LABS SLU. All rights reserved.</p>
+  </footer>
+
+</body>
+
+</html>
