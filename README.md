@@ -2,11 +2,13 @@
 
 Browsable website of the images downloadable with the SidecarTridge Multi-device.
 
-This is a single static page that reproduces the "Public Floppy Database" browser from
-the device's on-board UI (`browser_home.shtml` in `md-browser`), but hosted publicly so
-anyone can explore the catalog without a device attached. It reads the same public
-catalog (`https://ataristdb.sidecartridge.com/db/*.csv`) and links each entry straight to
-its downloadable image.
+**Live:** https://ataristpublicfloppydb.sidecartridge.com/
+
+A single static page that reproduces the "Public Floppy Database" browser from the device's
+on-board UI (`browser_home.shtml` in `md-browser`), hosted publicly so anyone can explore the
+catalog without a device attached. It reads the public catalog
+(`https://ataristdb.sidecartridge.com/db/*.csv`) and links each entry straight to its
+downloadable `.ST` image.
 
 ## Stack
 
@@ -22,16 +24,23 @@ python3 -m http.server 8000
 
 ## Deploy
 
-Pushing to `main` publishes to GitHub Pages via `.github/workflows/deploy.yml` (no build;
-the repo root is uploaded as-is). In the repository settings, set **Pages → Build and
-deployment → Source** to **GitHub Actions** once.
+Pushing to `main` publishes to GitHub Pages via `.github/workflows/deploy.yml` (no build; the
+repo root is uploaded as-is). The site is served over HTTPS on the custom domain in `CNAME`
+(`ataristpublicfloppydb.sidecartridge.com`). In the repository settings, Pages → Build and
+deployment → Source is **GitHub Actions**.
 
-## Requirement: HTTPS catalog host
+## SEO
 
-GitHub Pages is served over HTTPS, and browsers block a background `fetch()` to an `http://`
-URL as mixed content. The catalog host `ataristdb.sidecartridge.com` must therefore serve
-the `db/*.csv` files over **HTTPS** for the catalog to load on the deployed site. Until then
-the page renders but shows an empty catalog.
+`index.html` carries a keyword-aware `<title>` and meta description, a canonical link, Open
+Graph and Twitter Card tags (preview image: the SidecarTridge logo), and JSON-LD structured
+data (`WebSite` / `Organization` / `CollectionPage`). Mentions of the SidecarTridge
+Multi-device link to its
+[product page](https://sidecartridge.com/products/sidecartridge-multidevice-atari-st/).
+
+## Notes
+
+The catalog host `ataristdb.sidecartridge.com` serves `db/*.csv` over HTTPS — required because
+GitHub Pages is HTTPS-only and browsers block http subresource fetches as mixed content.
 
 ## Backlog
 
