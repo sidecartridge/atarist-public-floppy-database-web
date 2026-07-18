@@ -6,7 +6,63 @@
   <!-- Important for mobile: ensures responsive scaling -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="favicon.png">
-  <title>SidecarTridge Public Floppy Database</title>
+  <title>Atari ST Public Floppy Database — Download .ST Disk Images</title>
+  <meta name="description"
+    content="Browse the Atari ST public floppy database: hundreds of homebrew releases and classic .ST disk images, ready to load onto the SidecarTridge Multi-device." />
+  <link rel="canonical" href="https://ataristpublicfloppydb.sidecartridge.com/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SidecarTridge" />
+  <meta property="og:title" content="Atari ST Public Floppy Database — Download .ST Disk Images" />
+  <meta property="og:description"
+    content="Browse the Atari ST public floppy database: hundreds of homebrew releases and classic .ST disk images, ready to load onto the SidecarTridge Multi-device." />
+  <meta property="og:url" content="https://ataristpublicfloppydb.sidecartridge.com/" />
+  <meta property="og:image" content="https://sidecartridge.com/assets/images/logo/logo.png" />
+  <meta property="og:image:width" content="640" />
+  <meta property="og:image:height" content="640" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Atari ST Public Floppy Database — Download .ST Disk Images" />
+  <meta name="twitter:description"
+    content="Browse the Atari ST public floppy database: hundreds of homebrew releases and classic .ST disk images, ready to load onto the SidecarTridge Multi-device." />
+  <meta name="twitter:image" content="https://sidecartridge.com/assets/images/logo/logo.png" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://ataristpublicfloppydb.sidecartridge.com/#website",
+        "url": "https://ataristpublicfloppydb.sidecartridge.com/",
+        "name": "Atari ST Public Floppy Database",
+        "description": "Browse and download Atari ST homebrew releases and classic .ST disk images for the SidecarTridge Multi-device.",
+        "inLanguage": "en",
+        "publisher": { "@id": "https://sidecartridge.com/#organization" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://sidecartridge.com/#organization",
+        "name": "SidecarTridge",
+        "url": "https://sidecartridge.com/",
+        "logo": "https://sidecartridge.com/assets/images/logo/logo.png"
+      },
+      {
+        "@type": "CollectionPage",
+        "@id": "https://ataristpublicfloppydb.sidecartridge.com/#webpage",
+        "url": "https://ataristpublicfloppydb.sidecartridge.com/",
+        "name": "Atari ST Public Floppy Database — Download .ST Disk Images",
+        "description": "Browse and download Atari ST homebrew releases and classic .ST disk images for the SidecarTridge Multi-device.",
+        "isPartOf": { "@id": "https://ataristpublicfloppydb.sidecartridge.com/#website" },
+        "inLanguage": "en"
+      }
+    ]
+  }
+  </script>
 
   <!-- Pure.css (CDN) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css"
@@ -110,7 +166,7 @@
         recentSectionDescription() {
           return this.hasActiveFilters()
             ? 'Recent arrivals matching the current search and taxonomy filters.'
-            : 'Latest additions to the public floppy database.';
+            : 'Latest Atari ST additions to the public floppy database.';
         },
         archiveSectionDescription() {
           return this.hasActiveFilters()
@@ -179,8 +235,10 @@
   <header class="app-header">
     <div class="app-header-inner">
       <div class="app-header-copy">
-        <span class="app-header-kicker">SidecarTridge Multi-device</span>
-        <h1>Public Floppy Database</h1>
+        <span class="app-header-kicker"><a
+            href="https://sidecartridge.com/products/sidecartridge-multidevice-atari-st/" target="_blank"
+            rel="noopener" style="color:inherit">SidecarTridge Multi-device</a></span>
+        <h1>Atari ST Public Floppy Database</h1>
       </div>
       <button type="button" class="app-nav-toggle" aria-controls="primaryNav"
         :aria-expanded="navMenuOpen ? 'true' : 'false'" @click="navMenuOpen = !navMenuOpen">
@@ -205,10 +263,13 @@
     <section class="browser-hero">
       <div class="browser-hero-copy">
         <span class="browser-kicker">Public Floppy Database</span>
-        <h2>Explore new homebrew software alongside the timeless classics.</h2>
+        <h2>Explore new Atari ST homebrew alongside the timeless classics.</h2>
         <p>
-          The database moves in two directions: fresh uploads and the classic releases preserved in crew collections.
-          Use What&apos;s New for the latest arrivals, and the search engine to revisit old favorites.
+          The Atari ST public floppy database moves in two directions: fresh homebrew uploads and classic .ST disk
+          images preserved in crew collections. Use What&apos;s New for the latest arrivals, or search the archive to
+          revisit old favorites — then send any image straight to your <a
+            href="https://sidecartridge.com/products/sidecartridge-multidevice-atari-st/" target="_blank"
+            rel="noopener">SidecarTridge Multi-device</a>.
         </p>
       </div>
       <div class="browser-stat-grid">
