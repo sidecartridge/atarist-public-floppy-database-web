@@ -495,7 +495,7 @@
           <div class="browse-az">
             <template x-for="g in browseGroups()" :key="g.key">
               <button type="button" class="browse-az-btn"
-                :class="{'is-active': selectedGroup === g.key, 'is-disabled': g.count === 0}"
+                :class="{'is-active': selectedGroup === g.key, 'is-disabled': g.count === 0, 'browse-az-new': g.key === '_'}"
                 :disabled="g.count === 0" @click="setBrowseGroup(g.key)" :title="g.count + ' items'"
                 x-text="g.label"></button>
             </template>
@@ -513,6 +513,8 @@
                   <article class="browser-entry-row">
                     <div class="browser-entry-row-main">
                       <div class="browser-entry-row-title">
+                        <span class="browser-entry-date" x-show="entry.time"
+                          x-text="formatEntryTime(entry.time)"></span>
                         <h4 x-text="entry.name"></h4>
                         <span class="browser-entry-tag" x-show="entry.label" x-text="entry.label"></span>
                       </div>
