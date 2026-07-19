@@ -80,6 +80,7 @@
 
   <script>
     function appManager() {
+      const BROWSE_PAGE_SIZE = 50;
       return {
         baseDownloadUrl: 'https://ataristdb.sidecartridge.com/',
         initialized: false,
@@ -92,6 +93,9 @@
         labels: [],
         selectedLabel: '',
         navMenuOpen: false,
+        mode: 'search',
+        selectedGroup: '',
+        browsePage: 1,
         normalizedSearch() {
           return String(this.search || '').trim().toLowerCase();
         },
@@ -200,7 +204,7 @@
                     // remove carriage returns, trim whitespace, then strip surrounding quotes
                     const cleaned = parts.map(s => s.replace(/\r/g, '').trim().replace(/^"|"$/g, ''));
                     const [f1, , f3, , f5, f6] = cleaned;
-                    const entry = { name: f1, time: f3 || null, label: f5, path: f6 };
+                    const entry = { name: f1, time: f3 || null, label: f5, path: f6, letter: ch };
                     if (this.currentLetter === '_') {
                       // only dedupe for underscore file
                       if (!this.parsedEntries.some(e => e.name === entry.name && e.time === entry.time && e.label === entry.label && e.path === entry.path)) {
@@ -223,6 +227,49 @@
           const set = new Set(this.parsedEntries.map(e => e.label).filter(Boolean));
           this.labels = Array.from(set).sort();
           this.loaded = true;
+        },
+        // ----- Browse-by-letter mode -----
+        browseGroups() {
+          const keys = ['_', ...'abcdefghijklmnopqrstuvwxyz0123456789'];
+          const counts = new Map();
+          this.parsedEntries.forEach(e => counts.set(e.letter, (counts.get(e.letter) || 0) + 1));
+          return keys.map(k => ({
+            key: k,
+            label: k === '_' ? 'New' : k.toUpperCase(),
+            count: counts.get(k) || 0,
+          }));
+        },
+        setMode(m) {
+          this.mode = m;
+          if (m === 'browse' && !this.selectedGroup) {
+            const first = this.browseGroups().find(g => g.count > 0);
+            this.selectedGroup = first ? first.key : '';
+            this.browsePage = 1;
+          }
+        },
+        setBrowseGroup(key) {
+          this.selectedGroup = this.selectedGroup === key ? '' : key;
+          this.browsePage = 1;
+        },
+        browseEntriesAll() {
+          const list = this.parsedEntries.filter(e => e.letter === this.selectedGroup);
+          if (this.selectedGroup === '_') {
+            return list.slice().sort((a, b) => Number(b.time) - Number(a.time));
+          }
+          return list.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        },
+        browseTotalPages() {
+          return Math.max(1, Math.ceil(this.browseEntriesAll().length / BROWSE_PAGE_SIZE));
+        },
+        browsePageEntries() {
+          const start = (this.browsePage - 1) * BROWSE_PAGE_SIZE;
+          return this.browseEntriesAll().slice(start, start + BROWSE_PAGE_SIZE);
+        },
+        browsePrev() {
+          if (this.browsePage > 1) this.browsePage--;
+        },
+        browseNext() {
+          if (this.browsePage < this.browseTotalPages()) this.browsePage++;
         }
       };
     }
@@ -297,6 +344,14 @@
       </div>
     </div>
     <div x-show="loaded" class="browser-shell">
+      <div class="mode-toggle" role="tablist" aria-label="View mode">
+        <button type="button" class="mode-tab" :class="{'is-active': mode === 'search'}"
+          @click="setMode('search')">Search by title</button>
+        <button type="button" class="mode-tab" :class="{'is-active': mode === 'browse'}"
+          @click="setMode('browse')">Browse A–Z</button>
+      </div>
+
+      <div x-show="mode === 'search'">
       <section class="browser-filter-panel">
         <div class="browser-search-row">
           <label class="browser-search-field">
@@ -410,6 +465,65 @@
           </div>
         </template>
       </section>
+      </div>
+
+      <div x-show="mode === 'browse'">
+        <section class="browser-section">
+          <div class="browser-section-head">
+            <div>
+              <span class="browser-section-kicker">Browse</span>
+              <h3>By letter or number</h3>
+            </div>
+            <span class="browser-count-badge" x-show="selectedGroup" x-text="browseEntriesAll().length"></span>
+          </div>
+          <p class="browser-section-copy">Pick a letter or number to look through the catalog, one page at a time.</p>
+          <div class="browse-az">
+            <template x-for="g in browseGroups()" :key="g.key">
+              <button type="button" class="browse-az-btn"
+                :class="{'is-active': selectedGroup === g.key, 'is-disabled': g.count === 0}"
+                :disabled="g.count === 0" @click="setBrowseGroup(g.key)" :title="g.count + ' items'"
+                x-text="g.label"></button>
+            </template>
+          </div>
+          <template x-if="!selectedGroup">
+            <div class="browser-empty-state browser-empty-state-muted">
+              <i class="fas fa-hand-pointer"></i>
+              <p>Pick a letter or number above to start browsing.</p>
+            </div>
+          </template>
+          <template x-if="selectedGroup && browsePageEntries().length > 0">
+            <div>
+              <div class="browser-list">
+                <template x-for="(entry, idx) in browsePageEntries()" :key="entry.path + '-browse-' + idx">
+                  <article class="browser-entry-row">
+                    <div class="browser-entry-row-main">
+                      <div class="browser-entry-row-title">
+                        <h4 x-text="entry.name"></h4>
+                        <span class="browser-entry-tag" x-show="entry.label" x-text="entry.label"></span>
+                      </div>
+                      <p class="browser-entry-path" x-text="entry.path"></p>
+                    </div>
+                    <div class="browser-entry-actions browser-entry-actions-rail">
+                      <a class="browser-download-button" :href="baseDownloadUrl + entry.path" target="_blank"
+                        rel="noopener" aria-label="Download image">
+                        <span class="fas fa-download" aria-hidden="true"></span>
+                      </a>
+                    </div>
+                  </article>
+                </template>
+              </div>
+              <div class="browse-pager" x-show="browseTotalPages() > 1">
+                <button type="button" class="pure-button" :disabled="browsePage <= 1"
+                  @click="browsePrev()">‹ Prev</button>
+                <span class="browse-pager-info"
+                  x-text="'Page ' + browsePage + ' of ' + browseTotalPages() + ' (' + browseEntriesAll().length + ' items)'"></span>
+                <button type="button" class="pure-button" :disabled="browsePage >= browseTotalPages()"
+                  @click="browseNext()">Next ›</button>
+              </div>
+            </div>
+          </template>
+        </section>
+      </div>
     </div>
 
   </main>
