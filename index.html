@@ -204,7 +204,7 @@
                     // remove carriage returns, trim whitespace, then strip surrounding quotes
                     const cleaned = parts.map(s => s.replace(/\r/g, '').trim().replace(/^"|"$/g, ''));
                     const [f1, , f3, , f5, f6] = cleaned;
-                    const entry = { name: f1, time: f3 || null, label: f5, path: f6, letter: ch };
+                    const entry = { name: f1, time: f3 || null, label: f5, path: f6 };
                     if (this.currentLetter === '_') {
                       // only dedupe for underscore file
                       if (!this.parsedEntries.some(e => e.name === entry.name && e.time === entry.time && e.label === entry.label && e.path === entry.path)) {
@@ -229,15 +229,28 @@
           this.loaded = true;
         },
         // ----- Browse-by-letter mode -----
+        firstCharKey(name) {
+          const c = String(name || '').trim().charAt(0).toUpperCase();
+          if (c >= 'A' && c <= 'Z') return c;
+          if (c >= '0' && c <= '9') return c;
+          return '#';
+        },
         browseGroups() {
-          const keys = ['_', ...'abcdefghijklmnopqrstuvwxyz0123456789'];
+          // "New" = timestamped entries (same set as the Recent stat / What's New).
+          // Letters = the archive (untimestamped), grouped by the name's first character.
           const counts = new Map();
-          this.parsedEntries.forEach(e => counts.set(e.letter, (counts.get(e.letter) || 0) + 1));
-          return keys.map(k => ({
-            key: k,
-            label: k === '_' ? 'New' : k.toUpperCase(),
-            count: counts.get(k) || 0,
-          }));
+          let newCount = 0;
+          this.parsedEntries.forEach(e => {
+            if (e.time) { newCount += 1; return; }
+            const k = this.firstCharKey(e.name);
+            counts.set(k, (counts.get(k) || 0) + 1);
+          });
+          const groups = [{ key: '_', label: 'New', count: newCount }];
+          for (const k of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
+            groups.push({ key: k, label: k, count: counts.get(k) || 0 });
+          }
+          if (counts.get('#')) groups.push({ key: '#', label: '#', count: counts.get('#') });
+          return groups;
         },
         setMode(m) {
           this.mode = m;
@@ -252,11 +265,13 @@
           this.browsePage = 1;
         },
         browseEntriesAll() {
-          const list = this.parsedEntries.filter(e => e.letter === this.selectedGroup);
           if (this.selectedGroup === '_') {
-            return list.slice().sort((a, b) => Number(b.time) - Number(a.time));
+            return this.parsedEntries.filter(e => !!e.time).slice()
+              .sort((a, b) => Number(b.time) - Number(a.time));
           }
-          return list.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          return this.parsedEntries
+            .filter(e => !e.time && this.firstCharKey(e.name) === this.selectedGroup)
+            .slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
         },
         browseTotalPages() {
           return Math.max(1, Math.ceil(this.browseEntriesAll().length / BROWSE_PAGE_SIZE));
